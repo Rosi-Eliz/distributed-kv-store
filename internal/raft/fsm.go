@@ -58,6 +58,10 @@ func (f *FSM) Restore(rc io.ReadCloser) error {
 	return nil
 }
 
+func (f *FSM) Get(key string) (string, bool) {
+	return f.store.Get(key)
+}
+
 type fsmSnapshot struct {
 	store *store.Store
 }

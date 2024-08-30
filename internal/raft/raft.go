@@ -15,6 +15,11 @@ type Node struct {
 }
 
 func NewRaftNode(nodeID string, bindAddr string, raftDir string, kvStore *store.Store) (*Node, error) {
+	// Ensure the raft directory exists
+	if err := os.MkdirAll(raftDir, 0755); err != nil {
+		return nil, err
+	}
+
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(nodeID)
 

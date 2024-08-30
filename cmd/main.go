@@ -1,4 +1,4 @@
-package cmd
+package main
 
 import (
 	"github.com/Rosi-Eliz/distributed-kv-store/internal/raft"

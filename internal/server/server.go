@@ -25,6 +25,7 @@ func NewServer(raftNode *raft.Node) *Server {
 func (s *Server) routes() {
 	s.router.POST("/set", s.handleSet())
 	s.router.GET("/get/:key", s.handleGet())
+	s.router.DELETE("/delete/:key", s.handleDelete())
 	s.router.POST("/join", s.handleJoin())
 }
 
@@ -68,6 +69,29 @@ func (s *Server) handleGet() gin.HandlerFunc {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"value": value})
+	}
+}
+
+func (s *Server) handleDelete() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		key := c.Param("key")
+
+		cmd := raft.Command{
+			Op:  "delete",
+			Key: key,
+		}
+		data, err := json.Marshal(cmd)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		future := s.raftNode.Raft.Apply(data, 10*time.Second)
+		if future.Error() != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": future.Error().Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	}
 }
 
