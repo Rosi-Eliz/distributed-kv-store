@@ -27,13 +27,15 @@ func (s *Server) routes() {
 	s.router.GET("/get/:key", s.handleGet())
 	s.router.DELETE("/delete/:key", s.handleDelete())
 	s.router.POST("/join", s.handleJoin())
+	s.router.POST("/transaction", s.handleTransaction()) // New transaction endpoint
 }
 
 func (s *Server) handleSet() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
-			Key   string `json:"key"`
-			Value string `json:"value"`
+			Key   string        `json:"key"`
+			Value string        `json:"value"`
+			TTL   time.Duration `json:"ttl"` // TTL in seconds
 		}
 		if err := c.BindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -44,6 +46,7 @@ func (s *Server) handleSet() gin.HandlerFunc {
 			Op:    "set",
 			Key:   req.Key,
 			Value: req.Value,
+			TTL:   req.TTL,
 		}
 		data, err := json.Marshal(cmd)
 		if err != nil {
@@ -111,6 +114,29 @@ func (s *Server) handleJoin() gin.HandlerFunc {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"status": "node added"})
+	}
+}
+
+func (s *Server) handleTransaction() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var tx raft.Transaction
+		if err := c.BindJSON(&tx); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		data, err := json.Marshal(tx)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		future := s.raftNode.Raft.Apply(data, 10*time.Second)
+		if future.Error() != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": future.Error().Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "transaction applied"})
 	}
 }
 

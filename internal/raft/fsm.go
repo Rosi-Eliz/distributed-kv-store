@@ -6,14 +6,8 @@ import (
 	"github.com/Rosi-Eliz/distributed-kv-store/internal/store"
 	"github.com/hashicorp/raft"
 	"io"
-	log2 "log"
+	"log"
 )
-
-type Command struct {
-	Op    string
-	Key   string
-	Value string
-}
 
 type FSM struct {
 	store *store.Store
@@ -25,18 +19,21 @@ func NewFSM(store *store.Store) *FSM {
 	}
 }
 
-func (f *FSM) Apply(log *raft.Log) interface{} {
-	var c Command
-	if err := json.NewDecoder(bytes.NewBuffer(log.Data)).Decode(&c); err != nil {
-		log2.Printf("failed to decode command: %v", err)
+func (f *FSM) Apply(logEntry *raft.Log) interface{} {
+	var tx Transaction
+	if err := json.NewDecoder(bytes.NewBuffer(logEntry.Data)).Decode(&tx); err != nil {
+		log.Println("error decoding transaction")
 		return nil
 	}
 
-	switch c.Op {
-	case "set":
-		f.store.Set(c.Key, c.Value)
-	case "delete":
-		f.store.Delete(c.Key)
+	// Apply all commands in the transaction atomically
+	for _, cmd := range tx.Commands {
+		switch cmd.Op {
+		case "set":
+			f.store.Set(cmd.Key, cmd.Value, cmd.TTL)
+		case "delete":
+			f.store.Delete(cmd.Key)
+		}
 	}
 
 	return nil
